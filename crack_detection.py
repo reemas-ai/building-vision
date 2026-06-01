@@ -9,8 +9,8 @@ import random
 from torch.utils.data import DataLoader
 import torch.nn as nn
 #add the path 
-negative_image_path=Path('surface_crack/Negative')
-positive_image_path=Path('surface_crack/Positive')
+negative_image_path = Path('/root/.cache/kagglehub/datasets/arunrk7/surface-crack-detection/versions/1/Negative')
+positive_image_path = Path('/root/.cache/kagglehub/datasets/arunrk7/surface-crack-detection/versions/1/Positive')
 #load 200 image 
 image_negative=list(negative_image_path.glob("*"))[:400]
 image_positive=list(positive_image_path.glob("*"))[:400]
