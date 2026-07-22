@@ -19,8 +19,8 @@ base_path = Path(kagglehub.dataset_download("arunrk7/surface-crack-detection"))
 negative_image_path = base_path / 'Negative'
 positive_image_path = base_path / 'Positive'
 #load 200 image 
-image_negative=list(negative_image_path.glob("*"))[:5000]
-image_positive=list(positive_image_path.glob("*"))[:5000]
+image_negative=list(negative_image_path.glob("*"))[:2000]
+image_positive=list(positive_image_path.glob("*"))[:2000]
 print(f"Negative: {len(image_negative)}")
 print(f"Positive: {len(image_positive)}")
 #make a tensor
