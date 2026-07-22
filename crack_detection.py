@@ -7,6 +7,11 @@ import matplotlib.pyplot as plt
 import random
 from torch.utils.data import DataLoader
 import torch.nn as nn
+#--------------------------------------------------------------------------
+# GPU
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+#--------------------------------------------------------------------------
 #add the path 
 import kagglehub
 from pathlib import Path
@@ -67,7 +72,7 @@ class CrackDetector(nn.Module):
         x = self.relu(self.liner1(x))
         x = self.liner2(x) 
         return x
-model = CrackDetector()
+model = CrackDetector().to(device)
 print(model)
 
 criterion = nn.CrossEntropyLoss()  
@@ -77,6 +82,8 @@ num_epochs = 10
 
 for epochs in range(num_epochs):
     for images, labels in data_train_loader:
+        images = images.to(device)
+        labels = labels.to(device)
         output = model(images)
         loss = criterion(output, labels)    
         optimizer.zero_grad()
@@ -89,6 +96,8 @@ total = 0
 #test
 with torch.no_grad():
     for images, labels in data_test_loader:
+        images = images.to(device)
+        labels = labels.to(device)
         output = model(images)
         _, predicted = torch.max(output, 1)
         total += labels.size(0)
@@ -96,6 +105,10 @@ with torch.no_grad():
 
 accuracy = correct / total * 100
 print(f"Accuracy: {accuracy:.2f}%")
+
+
+torch.save(model.state_dict(), 'crack_model.pth')
+print("Model saved!")
 
 from torchvision import transforms
 
@@ -107,7 +120,7 @@ model.eval()
 with torch.no_grad():
     image_new = Image.open("x.png").convert("RGB")
     image_new = transform(image_new)
-    image_new = image_new.unsqueeze(0)
+    image_new = image_new.unsqueeze(0).to(device)
     output_new = model(image_new)
     _, predicted = torch.max(output_new, 1)
     if predicted.item() == 1:
@@ -115,5 +128,3 @@ with torch.no_grad():
     else:
         print("No Crack - Safe ✅")
 
-torch.save(model.state_dict(), 'crack_model.pth')
-print("Model saved!")
