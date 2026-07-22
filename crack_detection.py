@@ -4,16 +4,18 @@ import torch
 import torchvision    
 from PIL import Image 
 import matplotlib.pyplot as plt  
-from pathlib import Path 
 import random
 from torch.utils.data import DataLoader
 import torch.nn as nn
 #add the path 
-negative_image_path = Path('/root/.cache/kagglehub/datasets/arunrk7/surface-crack-detection/versions/1/Negative')
-positive_image_path = Path('/root/.cache/kagglehub/datasets/arunrk7/surface-crack-detection/versions/1/Positive')
+import kagglehub
+from pathlib import Path
+base_path = Path(kagglehub.dataset_download("arunrk7/surface-crack-detection"))
+negative_image_path = base_path / 'Negative'
+positive_image_path = base_path / 'Positive'
 #load 200 image 
-image_negative=list(negative_image_path.glob("*"))[:400]
-image_positive=list(positive_image_path.glob("*"))[:400]
+image_negative=list(negative_image_path.glob("*"))[:5000]
+image_positive=list(positive_image_path.glob("*"))[:5000]
 print(f"Negative: {len(image_negative)}")
 print(f"Positive: {len(image_positive)}")
 #make a tensor
@@ -71,7 +73,7 @@ print(model)
 criterion = nn.CrossEntropyLoss()  
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)  
 
-num_epochs = 3
+num_epochs = 10
 
 for epochs in range(num_epochs):
     for images, labels in data_train_loader:
@@ -112,3 +114,6 @@ with torch.no_grad():
         print("Crack Detected! ⚠️")
     else:
         print("No Crack - Safe ✅")
+
+torch.save(model.state_dict(), 'crack_model.pth')
+print("Model saved!")
