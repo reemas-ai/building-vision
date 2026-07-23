@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import random
 from torch.utils.data import DataLoader
 import torch.nn as nn
+from torchvision.models import resnet50, ResNet50_Weights
 #--------------------------------------------------------------------------
 # GPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -24,10 +25,11 @@ image_negative=list(negative_image_path.glob("*"))[:2000]
 image_positive=list(positive_image_path.glob("*"))[:2000]
 print(f"Negative: {len(image_negative)}")
 print(f"Positive: {len(image_positive)}")
+#--------------------------------------------------------------------------
 #make a tensor
 to_tensor = torchvision.transforms.ToTensor()
 transform_train = transforms.Compose([
-    transforms.Resize((227, 227)),
+    transforms.Resize((224, 224)),
     transforms.RandomHorizontalFlip(p=0.5),
     transforms.RandomVerticalFlip(p=0.5),
     transforms.RandomRotation(degrees=15),
@@ -36,9 +38,10 @@ transform_train = transforms.Compose([
 ])
 
 transform_test = transforms.Compose([
-    transforms.Resize((227, 227)),
+    transforms.Resize((224, 224)),
     transforms.ToTensor()
 ])
+#--------------------------------------------------------------------------
 #function : conver the image to tensor 
 def image_to_tensor(images, label, transform):
     image_tensor = []
@@ -47,6 +50,7 @@ def image_to_tensor(images, label, transform):
         img = transform(img)
         image_tensor.append((img, label))
     return image_tensor
+#--------------------------------------------------------------------------
 #The Dataset after conver 
 negative_data = image_to_tensor(image_negative, 0, transform_train)
 positive_data = image_to_tensor(image_positive, 1, transform_train)
@@ -60,36 +64,21 @@ random.shuffle(dataset_test)
 train_data = dataset_train
 test_data = dataset_test
 print(f"Total: {len(dataset_train) + len(dataset_test)}")
-
+#--------------------------------------------------------------------------
 #make training and testing data
 
 data_train_loader=DataLoader(train_data,batch_size=32,shuffle=True)
 data_test_loader=DataLoader(test_data,batch_size=32,shuffle=False)
-
-
-
-
-class CrackDetector(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.conv1=nn.Conv2d(3, 16,kernel_size=3, padding=1)
-        self.pool1=nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv2=nn.Conv2d(16,32 ,kernel_size=3, padding=1)
-        self.pool2=nn.MaxPool2d(kernel_size=2, stride=2)
-        self.liner1=nn.Linear(in_features=100352, out_features=128)
-        self.liner2=nn.Linear(in_features=128, out_features=2)
-        self.relu = nn.ReLU()
-    def forward(self, x):
-        x = self.relu(self.conv1(x))
-        x = self.pool1(x)
-        x = self.relu(self.conv2(x))
-        x = self.pool2(x)
-        x = x.view(x.size(0), -1)
-        x = self.relu(self.liner1(x))
-        x = self.liner2(x) 
-        return x
-model = CrackDetector().to(device)
-print(model)
+#--------------------------------------------------------------------------
+#Download the model
+model = resnet50(weights=ResNet50_Weights.DEFAULT)
+for param in model.parameters():
+    param.requires_grad = False
+num_classes=2
+model.fc = nn.Linear(in_features=2048, out_features=num_classes)
+model = model.to(device)
+print(model.fc)
+#--------------------------------------------------------------------------
 
 criterion = nn.CrossEntropyLoss()  
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)  
@@ -109,6 +98,7 @@ for epochs in range(num_epochs):
 
 correct = 0
 total = 0
+#--------------------------------------------------------------------------
 #test
 with torch.no_grad():
     for images, labels in data_test_loader:
@@ -121,14 +111,14 @@ with torch.no_grad():
 
 accuracy = correct / total * 100
 print(f"Accuracy: {accuracy:.2f}%")
-
-
+#--------------------------------------------------------------------------
+#save the model
 torch.save(model.state_dict(), 'crack_model.pth')
 print("Model saved!")
-
+#--------------------------------------------------------------------------
 
 transform = transforms.Compose([
-    transforms.Resize((227, 227)),
+    transforms.Resize((224, 224)),
     transforms.ToTensor()
 ])
 model.eval()
