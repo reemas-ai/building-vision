@@ -148,4 +148,4 @@ def predict_image(image_path):
         _, predicted = torch.max(output, 1)
         
         return "Crack Detected! " if predicted.item() == 1 else "No Crack - Safe "
-print(predict_image("17254_1.jpg"))
+print(predict_image("00897.jpg"))
