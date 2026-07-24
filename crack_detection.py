@@ -1,13 +1,14 @@
 import os
-from torchvision import transforms
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
-import torch          
-import torchvision    
-from PIL import Image 
-import matplotlib.pyplot as plt  
 import random
-from torch.utils.data import DataLoader
-import torch.nn as nn
+from PIL import Image 
+from torchvision import transforms
+import torch
+import kagglehub
+from pathlib import Path          
+import torchvision    
+import torch.nn as nn  
+from torch.utils.data import DataLoader, Dataset
 from torchvision.models import resnet50, ResNet50_Weights
 #--------------------------------------------------------------------------
 # GPU
@@ -15,16 +16,22 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 #--------------------------------------------------------------------------
 #add the path 
-import kagglehub
-from pathlib import Path
 base_path = Path(kagglehub.dataset_download("arunrk7/surface-crack-detection"))
 negative_image_path = base_path / 'Negative'
 positive_image_path = base_path / 'Positive'
-#load 200 image 
 image_negative=list(negative_image_path.glob("*"))[:2000]
 image_positive=list(positive_image_path.glob("*"))[:2000]
 print(f"Negative: {len(image_negative)}")
 print(f"Positive: {len(image_positive)}")
+#--------------------------------------------------------------------------
+#the data 
+all_data = [(img, 0) for img in image_negative] + [(img, 1) for img in image_positive]
+random.shuffle(all_data)
+split_idx = int(len(all_data) * 0.8)
+train_pairs = all_data[:split_idx]
+test_pairs = all_data[split_idx:]
+
+print(f"Train samples: {len(train_pairs)}, Test samples: {len(test_pairs)}")
 #--------------------------------------------------------------------------
 #make a tensor
 to_tensor = torchvision.transforms.ToTensor()
@@ -47,32 +54,27 @@ transform_test = transforms.Compose([
 ])
 #--------------------------------------------------------------------------
 #function : conver the image to tensor 
-def image_to_tensor(images, label, transform):
-    image_tensor = []
-    for image in images:
-        img = Image.open(image).convert("RGB")
-        img = transform(img)
-        image_tensor.append((img, label))
-    return image_tensor
+class CrackDataset(Dataset):
+    def __init__(self, image_pairs, transform=None):
+        self.image_pairs = image_pairs
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.image_pairs)
+
+    def __getitem__(self, idx):
+        img_path, label = self.image_pairs[idx]
+        image = Image.open(img_path).convert("RGB")
+        if self.transform:
+            image = self.transform(image)
+        return image, label
 #--------------------------------------------------------------------------
 #The Dataset after conver 
-negative_data = image_to_tensor(image_negative, 0, transform_train)
-positive_data = image_to_tensor(image_positive, 1, transform_train)
-negative_test = image_to_tensor(image_negative, 0, transform_test)
-positive_test = image_to_tensor(image_positive, 1, transform_test)
-dataset_train = negative_data + positive_data
-dataset_test = negative_test + positive_test
-random.shuffle(dataset_train)
-random.shuffle(dataset_test)
+data_train = DataLoader(CrackDataset(train_pairs, transform_train), batch_size=32, shuffle=True)
+data_test= DataLoader(CrackDataset(test_pairs, transform_test), batch_size=32, shuffle=False)
 
-train_data = dataset_train
-test_data = dataset_test
-print(f"Total: {len(dataset_train) + len(dataset_test)}")
+print(f"Total: {len(train_pairs) + len(test_pairs)}")
 #--------------------------------------------------------------------------
-#make training and testing data
-
-data_train_loader=DataLoader(train_data,batch_size=32,shuffle=True)
-data_test_loader=DataLoader(test_data,batch_size=32,shuffle=False)
 #--------------------------------------------------------------------------
 #Download the model
 model = resnet50(weights=ResNet50_Weights.DEFAULT)
@@ -90,7 +92,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 num_epochs = 10
 
 for epochs in range(num_epochs):
-    for images, labels in data_train_loader:
+    for images, labels in data_train:
         images = images.to(device)
         labels = labels.to(device)
         output = model(images)
@@ -105,7 +107,7 @@ total = 0
 #--------------------------------------------------------------------------
 #test
 with torch.no_grad():
-    for images, labels in data_test_loader:
+    for images, labels in data_test:
         images = images.to(device)
         labels = labels.to(device)
         output = model(images)
@@ -120,22 +122,13 @@ print(f"Accuracy: {accuracy:.2f}%")
 torch.save(model.state_dict(), 'crack_model.pth')
 print("Model saved!")
 #--------------------------------------------------------------------------
-
-transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], 
-                     std=[0.229, 0.224, 0.225])
-                     ])
-model.eval()
-with torch.no_grad():
-    image_new = Image.open("x.png").convert("RGB")
-    image_new = transform(image_new)
-    image_new = image_new.unsqueeze(0).to(device)
-    output_new = model(image_new)
-    _, predicted = torch.max(output_new, 1)
-    if predicted.item() == 1:
-        print("Crack Detected! ⚠️")
-    else:
-        print("No Crack - Safe ✅")
-
+def predict_image(image_path):
+    model.eval()
+    with torch.no_grad():
+        img = Image.open(image_path).convert("RGB")
+        img_tensor = transform_test(img).unsqueeze(0).to(device)
+        output = model(img_tensor)
+        _, predicted = torch.max(output, 1)
+        
+        return "Crack Detected! " if predicted.item() == 1 else "No Crack - Safe "
+print(predict_image("x.png"))
