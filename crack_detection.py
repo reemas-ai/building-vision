@@ -10,6 +10,8 @@ import torchvision
 import torch.nn as nn  
 from torch.utils.data import DataLoader, Dataset
 from torchvision.models import resnet50, ResNet50_Weights
+import cv2
+import numpy as np
 #--------------------------------------------------------------------------
 # GPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -23,6 +25,22 @@ image_negative=list(negative_image_path.glob("*"))[:2000]
 image_positive=list(positive_image_path.glob("*"))[:2000]
 print(f"Negative: {len(image_negative)}")
 print(f"Positive: {len(image_positive)}")
+#--------------------------------------------------------------------------
+#image processing function
+def image_processing(image_path):
+    image = cv2.imread(str(image_path))  
+
+    gray_image=cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
+
+    gray_image_n = cv2.GaussianBlur(gray_image, (3,3), 0)
+
+    denoised = cv2.medianBlur(gray_image_n,5)
+    
+    image_canny = cv2.Canny(denoised, threshold1=50, threshold2=150)
+
+    image_rgb = cv2.cvtColor(image_canny, cv2.COLOR_GRAY2RGB)
+
+    return Image.fromarray(image_rgb)
 #--------------------------------------------------------------------------
 #the data 
 all_data = [(img, 0) for img in image_negative] + [(img, 1) for img in image_positive]
@@ -40,7 +58,6 @@ transform_train = transforms.Compose([
     transforms.RandomHorizontalFlip(p=0.5),
     transforms.RandomVerticalFlip(p=0.5),
     transforms.RandomRotation(degrees=15),
-    transforms.ColorJitter(brightness=0.3, contrast=0.3),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], 
                      std=[0.229, 0.224, 0.225])
@@ -64,7 +81,7 @@ class CrackDataset(Dataset):
 
     def __getitem__(self, idx):
         img_path, label = self.image_pairs[idx]
-        image = Image.open(img_path).convert("RGB")
+        image = image_processing(img_path)
         if self.transform:
             image = self.transform(image)
         return image, label
@@ -125,8 +142,8 @@ print("Model saved!")
 def predict_image(image_path):
     model.eval()
     with torch.no_grad():
-        img = Image.open(image_path).convert("RGB")
-        img_tensor = transform_test(img).unsqueeze(0).to(device)
+        image = image_processing(image_path)
+        img_tensor = transform_test(image).unsqueeze(0).to(device)
         output = model(img_tensor)
         _, predicted = torch.max(output, 1)
         
