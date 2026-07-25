@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision.models import resnet50, ResNet50_Weights
 import cv2
 from sklearn.metrics import classification_report, confusion_matrix
+import matplotlib.pyplot as plt
 #--------------------------------------------------------------------------
 # GPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -100,7 +101,7 @@ criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)  
 
 num_epochs = 10
-
+losses = []
 for epochs in range(num_epochs):
     for images, labels in data_train:
         images = images.to(device)
@@ -110,7 +111,15 @@ for epochs in range(num_epochs):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step() 
+    losses.append(loss.item())
     print(f"Epoch {epochs+1}/{num_epochs} - Loss: {loss.item():.4f}")
+    
+plt.plot(range(1, num_epochs + 1), losses)
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.title('Training Loss over Epochs')
+plt.grid()
+plt.savefig('training_loss.png')
 
 correct = 0
 total = 0
