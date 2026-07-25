@@ -120,7 +120,7 @@ plt.ylabel('Loss')
 plt.title('Training Loss over Epochs')
 plt.grid()
 plt.savefig('training_loss.png')
-
+plt.show()
 correct = 0
 total = 0
 #--------------------------------------------------------------------------
