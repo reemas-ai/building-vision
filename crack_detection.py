@@ -11,7 +11,6 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 from torchvision.models import resnet50, ResNet50_Weights
 import cv2
-import numpy as np
 #--------------------------------------------------------------------------
 # GPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -30,18 +29,8 @@ print(f"Positive: {len(image_positive)}")
 def image_processing(image_path):
     
     image = cv2.imread(str(image_path))  
-    if image is None:
-        raise FileNotFoundError(f"لا يمكن قراءة الصورة: {image_path}")
 
-    
-    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    denoised = cv2.medianBlur(gray_image, 5)
-    image_canny = cv2.Canny(denoised, threshold1=100, threshold2=200) # رفعنا العتبة لتخفيف الضوضاء
-
-    
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-    image_rgb[image_canny > 0] = [255, 0, 0]
 
     return Image.fromarray(image_rgb)
 #--------------------------------------------------------------------------
@@ -154,4 +143,5 @@ def predict_image(image_path):
 print(predict_image("19999.jpg"))
 print(predict_image("y.png"))
 print(predict_image("19995.jpg"))
+print(predict_image("x.png"))
 
