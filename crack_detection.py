@@ -11,6 +11,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 from torchvision.models import resnet50, ResNet50_Weights
 import cv2
+from sklearn.metrics import classification_report, confusion_matrix
 #--------------------------------------------------------------------------
 # GPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -115,6 +116,8 @@ correct = 0
 total = 0
 #--------------------------------------------------------------------------
 #test
+labels_all=[]
+predicted_all=[]
 with torch.no_grad():
     for images, labels in data_test:
         images = images.to(device)
@@ -123,9 +126,15 @@ with torch.no_grad():
         _, predicted = torch.max(output, 1)
         total += labels.size(0)
         correct += (predicted == labels).sum().item()
-
+        labels_all.extend(labels.cpu().numpy())
+        predicted_all.extend(predicted.cpu().numpy())
+    
 accuracy = correct / total * 100
 print(f"Accuracy: {accuracy:.2f}%")
+cm=confusion_matrix(labels_all, predicted_all)
+print("Confusion Matrix:",cm)
+print(classification_report(labels_all, predicted_all, 
+      target_names=['No Crack', 'Crack']))
 #--------------------------------------------------------------------------
 #save the model
 torch.save(model.state_dict(), 'crack_model.pth')
