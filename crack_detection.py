@@ -13,6 +13,7 @@ from torchvision.models import resnet50, ResNet50_Weights
 import cv2
 from sklearn.metrics import classification_report, confusion_matrix
 import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
 #--------------------------------------------------------------------------
 # GPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -29,24 +30,16 @@ print(f"Positive: {len(image_positive)}")
 #--------------------------------------------------------------------------
 #image processing function
 def image_processing(image_path):
-    
-    image = cv2.imread(str(image_path))  
+    image = cv2.imread(str(image_path))
+
+    if image is None:
+        raise ValueError(f"Cannot read image: {image_path}")
 
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
     return Image.fromarray(image_rgb)
 #--------------------------------------------------------------------------
-#the data 
-all_data = [(img, 0) for img in image_negative] + [(img, 1) for img in image_positive]
-random.shuffle(all_data)
-split_idx = int(len(all_data) * 0.8)
-train_pairs = all_data[:split_idx]
-test_pairs = all_data[split_idx:]
-
-print(f"Train samples: {len(train_pairs)}, Test samples: {len(test_pairs)}")
-#--------------------------------------------------------------------------
 #make a tensor
-to_tensor = torchvision.transforms.ToTensor()
+
 transform_train = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.RandomHorizontalFlip(p=0.5),
@@ -80,12 +73,54 @@ class CrackDataset(Dataset):
             image = self.transform(image)
         return image, label
 #--------------------------------------------------------------------------
-#The Dataset after conver 
-data_train = DataLoader(CrackDataset(train_pairs, transform_train), batch_size=32, shuffle=True)
-data_test= DataLoader(CrackDataset(test_pairs, transform_test), batch_size=32, shuffle=False)
+#the data 
+all_data = [(img, 0) for img in image_negative] + [(img, 1) for img in image_positive]
 
-print(f"Total: {len(train_pairs) + len(test_pairs)}")
-#--------------------------------------------------------------------------
+image_paths = [item[0] for item in all_data]
+labels = [item[1] for item in all_data]
+
+X_train, X_temp, y_train, y_temp = train_test_split(
+    image_paths,
+    labels,
+    test_size=0.2,
+    random_state=42,
+    shuffle=True,
+    stratify=labels
+)
+
+X_val, X_test, y_val, y_test = train_test_split(
+    X_temp,
+    y_temp,
+    test_size=0.5,
+    random_state=42,
+    shuffle=True,
+    stratify=y_temp
+)
+
+train_pairs = list(zip(X_train, y_train))
+val_pairs = list(zip(X_val, y_val))
+test_pairs = list(zip(X_test, y_test))
+
+data_train = DataLoader(
+    CrackDataset(train_pairs, transform_train),
+    batch_size=32,
+    shuffle=True
+)
+
+data_val = DataLoader(
+    CrackDataset(val_pairs, transform_test),
+    batch_size=32,
+    shuffle=False
+)
+
+data_test = DataLoader(
+    CrackDataset(test_pairs, transform_test),
+    batch_size=32,
+    shuffle=False
+)
+
+print(f"Total: {len(train_pairs) + len(val_pairs) + len(test_pairs)}")
+
 #--------------------------------------------------------------------------
 #Download the model
 model = resnet50(weights=ResNet50_Weights.DEFAULT)
@@ -98,11 +133,18 @@ print(model.fc)
 #--------------------------------------------------------------------------
 
 criterion = nn.CrossEntropyLoss()  
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)  
+optimizer = torch.optim.Adam(model.fc.parameters(), lr=0.001)
 
 num_epochs = 10
 losses = []
+
 for epochs in range(num_epochs):
+    los=0.0
+    model.train()
+    
+    model.apply(
+    lambda m: m.eval() if isinstance(m, nn.BatchNorm2d) else None
+)
     for images, labels in data_train:
         images = images.to(device)
         labels = labels.to(device)
@@ -111,9 +153,40 @@ for epochs in range(num_epochs):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step() 
-    losses.append(loss.item())
-    print(f"Epoch {epochs+1}/{num_epochs} - Loss: {loss.item():.4f}")
+        los += loss.item() * labels.size(0)
     
+    val_loss = 0.0
+    val_correct = 0
+    val_total = 0
+    model.eval()
+
+    with torch.no_grad():
+     for images, labels in data_val:
+        images = images.to(device)
+        labels = labels.to(device)
+
+        output = model(images)
+        loss = criterion(output, labels)
+
+        val_loss += loss.item() * labels.size(0)
+        _, predicted = torch.max(output, 1)
+
+        val_total += labels.size(0)
+        val_correct += (predicted == labels).sum().item()
+    avg_loss = los / len(train_pairs)
+
+    avg_val_loss = val_loss / val_total
+    val_accuracy = (val_correct / val_total) * 100
+
+    losses.append(avg_loss)
+
+    print(
+        f"Epoch {epochs+1}/{num_epochs} "
+        f"- Train Loss: {avg_loss:.4f} "
+        f"- Val Loss: {avg_val_loss:.4f} "
+        f"- Val Accuracy: {val_accuracy:.2f}%"
+    )
+
 plt.plot(range(1, num_epochs + 1), losses)
 plt.xlabel('Epochs')
 plt.ylabel('Loss')
@@ -126,6 +199,9 @@ total = 0
 #test
 labels_all=[]
 predicted_all=[]
+
+model.eval()
+
 with torch.no_grad():
     for images, labels in data_test:
         images = images.to(device)
@@ -156,7 +232,7 @@ def predict_image(image_path):
         output = model(img_tensor)
         _, predicted = torch.max(output, 1)
         
-        return "Crack Detected! " if predicted.item() == 1 else "No Crack - Safe "
+        return "Crack Detected" if predicted.item() == 1 else "No Crack Detected"
 print(predict_image("19999.jpg"))
 print(predict_image("y.png"))
 print(predict_image("19995.jpg"))
