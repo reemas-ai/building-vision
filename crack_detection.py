@@ -1,19 +1,21 @@
 import os
-os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
-import random
-from PIL import Image 
-from torchvision import transforms
-import torch
-import kagglehub
-from pathlib import Path          
-import torchvision    
-import torch.nn as nn  
-from torch.utils.data import DataLoader, Dataset
-from torchvision.models import resnet50, ResNet50_Weights
+import hashlib
+from pathlib import Path
+
 import cv2
-from sklearn.metrics import classification_report, confusion_matrix
+import kagglehub
+import torch
+import torch.nn as nn
 import matplotlib.pyplot as plt
+
+from PIL import Image
+from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
+from torchvision.models import resnet50, ResNet50_Weights
+
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 #--------------------------------------------------------------------------
 # GPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -250,8 +252,5 @@ def predict_image(image_path):
         _, predicted = torch.max(output, 1)
         
         return "Crack Detected" if predicted.item() == 1 else "No Crack Detected"
-print(predict_image("19999.jpg"))
-print(predict_image("y.png"))
-print(predict_image("19995.jpg"))
-print(predict_image("x.png"))
+
 

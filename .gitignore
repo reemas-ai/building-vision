@@ -1,5 +1,19 @@
+# Environment and temporary files
 .env
 __pycache__/
 *.pyc
 .vscode/
+
+# Local datasets
 surface_crack/
+images/
+
+# Duplicate repository
+/building-vision/
+
+# Trained models
+*.pth
+
+# Local test images
+*.jpg
+*.png
