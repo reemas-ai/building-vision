@@ -75,6 +75,23 @@ class CrackDataset(Dataset):
 #--------------------------------------------------------------------------
 #the data 
 all_data = [(img, 0) for img in image_negative] + [(img, 1) for img in image_positive]
+import hashlib
+
+unique_data = []
+seen_hashes = set()
+
+for img_path, label in all_data:
+    with open(img_path, "rb") as f:
+        image_hash = hashlib.sha256(f.read()).hexdigest()
+
+    if image_hash not in seen_hashes:
+        seen_hashes.add(image_hash)
+        unique_data.append((img_path, label))
+
+print("Original images:", len(all_data))
+print("Unique images:", len(unique_data))
+
+all_data = unique_data
 
 image_paths = [item[0] for item in all_data]
 labels = [item[1] for item in all_data]
