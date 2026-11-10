@@ -25,8 +25,8 @@ print(f"Using device: {device}")
 base_path = Path(kagglehub.dataset_download("arunrk7/surface-crack-detection"))
 negative_image_path = base_path / 'Negative'
 positive_image_path = base_path / 'Positive'
-image_negative=list(negative_image_path.glob("*"))[:2000]
-image_positive=list(positive_image_path.glob("*"))[:2000]
+image_negative=list(negative_image_path.glob("*"))[:15000]
+image_positive=list(positive_image_path.glob("*"))[:15000]
 print(f"Negative: {len(image_negative)}")
 print(f"Positive: {len(image_positive)}")
 #--------------------------------------------------------------------------
@@ -77,7 +77,7 @@ class CrackDataset(Dataset):
 #--------------------------------------------------------------------------
 #the data 
 all_data = [(img, 0) for img in image_negative] + [(img, 1) for img in image_positive]
-import hashlib
+
 
 unique_data = []
 seen_hashes = set()
@@ -239,9 +239,14 @@ print("Confusion Matrix:",cm)
 print(classification_report(labels_all, predicted_all, 
       target_names=['No Crack', 'Crack']))
 #--------------------------------------------------------------------------
-#save the model
-torch.save(model.state_dict(), 'crack_model.pth')
-print("Model saved!")
+# Save the model
+model_path = Path("/content/crack_model.pth")
+
+torch.save(model.state_dict(), model_path)
+
+print("Model saved:", model_path.is_file())
+print("Size (MB):", round(model_path.stat().st_size / (1024 ** 2), 2))
+print("Full path:", model_path.resolve())
 #--------------------------------------------------------------------------
 def predict_image(image_path):
     model.eval()
